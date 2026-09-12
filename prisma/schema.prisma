@@ -1,0 +1,171 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  STUDENT
+}
+
+enum UserStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AcademicDayType {
+  WORKING_DAY
+  HOLIDAY
+}
+
+enum AttendanceSessionStatus {
+  DRAFT
+  COMPLETED
+}
+
+enum AttendanceStatus {
+  UNMARKED
+  PRESENT
+  ABSENT
+}
+
+model User {
+  id           Int        @id @default(autoincrement())
+  username     String     @unique
+  passwordHash String
+  role         UserRole
+  status       UserStatus @default(PENDING)
+
+  student Student?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Student {
+  id          Int     @id @default(autoincrement())
+  userId      Int     @unique
+  hallTicket  String  @unique
+  name        String
+  branchId    Int
+  studyYearId Int
+  email       String?
+  phone       String?
+  isActive    Boolean @default(true)
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branch    Branch    @relation(fields: [branchId], references: [id])
+  studyYear StudyYear @relation(fields: [studyYearId], references: [id])
+  attendance Attendance[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([branchId])
+  @@index([studyYearId])
+  @@index([branchId, studyYearId])
+}
+
+model Branch {
+  id       Int     @id @default(autoincrement())
+  name     String
+  code     String  @unique
+  isActive Boolean @default(true)
+
+  students Student[]
+  attendanceSessions AttendanceSession[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model StudyYear {
+  id        Int     @id @default(autoincrement())
+  name      String  @unique
+  number    Int     @unique
+  isActive  Boolean @default(true)
+
+  students  Student[]
+  semesters Semester[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Semester {
+  id          Int      @id @default(autoincrement())
+  studyYearId Int
+  name        String
+  number      Int
+  startDate   DateTime
+  endDate     DateTime
+  isActive    Boolean  @default(true)
+
+  studyYear    StudyYear     @relation(fields: [studyYearId], references: [id], onDelete: Cascade)
+  academicDays AcademicDay[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([studyYearId, number])
+  @@index([studyYearId])
+}
+
+model AcademicDay {
+  id         Int             @id @default(autoincrement())
+  semesterId Int
+  date       DateTime
+  type       AcademicDayType
+  remarks    String?
+  markedBy   Int?
+
+  semester Semester @relation(fields: [semesterId], references: [id], onDelete: Cascade)
+  sessions AttendanceSession[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([semesterId, date])
+  @@index([semesterId])
+}
+
+model AttendanceSession {
+  id            Int                     @id @default(autoincrement())
+  academicDayId Int
+  branchId      Int
+  status        AttendanceSessionStatus @default(DRAFT)
+  createdBy     Int
+  completedAt   DateTime?
+  createdAt     DateTime                @default(now())
+
+  academicDay AcademicDay @relation(fields: [academicDayId], references: [id], onDelete: Cascade)
+  branch      Branch      @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  attendance  Attendance[]
+
+  @@unique([academicDayId, branchId])
+  @@index([academicDayId])
+  @@index([branchId])
+  @@index([status])
+}
+
+model Attendance {
+  id        Int              @id @default(autoincrement())
+  sessionId Int
+  studentId Int
+  status    AttendanceStatus
+
+  session AttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  student Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([sessionId, studentId])
+  @@index([studentId])
+  @@index([sessionId])
+}
